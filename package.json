@@ -1,0 +1,33 @@
+{
+  "name": "three-webmcp",
+  "version": "0.1.0",
+  "description": "Expose Three.js scenes to AI agents through WebMCP.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "test:browser": "playwright test",
+    "example": "vite examples --host 127.0.0.1",
+    "example:build": "vite build examples --outDir ../example-dist",
+    "prepack": "npm run build"
+  },
+  "peerDependencies": {"three": ">=0.186.0 <0.187.0"},
+  "repository": {"type": "git", "url": "git+https://github.com/takahirox/three-webmcp.git"},
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/three": "^0.186.0",
+    "three": "^0.186.0",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.0"
+  }
+}
