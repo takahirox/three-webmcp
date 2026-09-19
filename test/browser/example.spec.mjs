@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('native WebMCP: inspect, identify, update, inspect renderer, dispose', async ({ page }) => {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/');
+  await page.goto('/cube/');
   const supported = await page.evaluate(() => typeof document.modelContext?.getTools === 'function');
   expect(supported, 'Chromium must support the current WebMCP API with its feature flag enabled').toBe(true);
   await expect(page.locator('#status')).toContainText('Ready:');
@@ -36,7 +36,7 @@ test('native WebMCP: inspect, identify, update, inspect renderer, dispose', asyn
 
 test('unsupported browsers still render the example', async ({ page }) => {
   await page.addInitScript(() => Object.defineProperty(document, 'modelContext', { value: undefined }));
-  await page.goto('/');
+  await page.goto('/cube/');
   await expect(page.locator('#status')).toContainText('WebMCP is unavailable');
   await expect(page.locator('canvas')).toBeVisible();
 });
@@ -50,7 +50,7 @@ test('native registration rollback preserves an existing tool with the same name
       execute: async () => ({ owner: 'application' }),
     });
   });
-  await page.goto('/');
+  await page.goto('/cube/');
   await expect(page.locator('#status')).toContainText('Tool registration failed:');
   const result = await page.evaluate(async () => {
     await globalThis.existingToolReady;

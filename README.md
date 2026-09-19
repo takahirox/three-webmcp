@@ -101,6 +101,82 @@ Registered only when a renderer is provided. Input: `{}`. Returns:
 
 Statistics are read from `renderer.info` without rendering or resetting counters. Their time window follows the renderer's `info.autoReset` setting. Both inspection tools have the read-only annotation; the update tool does not.
 
+## Robot playground
+
+```sh
+npm ci
+npm run example
+```
+
+Open the printed local URL for the **robot playground** (`/`). The original **cube example** is still available at `/cube/`. The robot model is included locally, so neither demo needs a CDN or an AI API key. Both pages are included in `npm run example:build` under `example-dist/` (serve that directory over HTTP).
+
+The robot is based on the [Three.js skinning and morphing example](https://threejs.org/examples/#webgl_animation_skinning_morph), with a control panel for states, gestures, expressions, travel, and turning. Click the floor to move, or enter an X/Z destination and choose Walk or Run. Manual controls and agent tools use exactly the same character controller. The panel shows changes made by an agent, too.
+
+Try asking a connected agent:
+
+> Walk to x=-3, z=0. Wait until you arrive, then face the camera and wave.
+
+> Look surprised, jump, then dance.
+
+> Run to x=4, z=2. Stop now.
+
+### Robot tools
+
+These tools belong to the demo, not the library's public API. The three common library tools are also available. Prefer robot tools for character behavior; direct bone/root edits through `three.object.update` may be overwritten by animation or travel.
+
+| Tool | Input / behavior |
+| --- | --- |
+| `robot.inspect` | `{}`; readiness, supported actions, expression names, position, heading, active action, travel state, and camera position |
+| `robot.state` | `{ "state": "Dance" }`; sets an animation in place and cancels travel/gestures |
+| `robot.gesture` | `{ "name": "Wave" }`; plays once, then restores the base state |
+| `robot.expression` | `{ "name": "Surprised", "weight": 0.8 }`; changes one expression independently |
+| `robot.move` | `{ "x": -3, "z": 0, "gait": "Walking" }`; gait can also be `Running` |
+| `robot.stop` | `{}`; stops travel/gestures and returns to Idle |
+| `robot.turn` | `{ "headingDegrees": 90 }` or `{ "toward": { "x": 10, "z": 18 } }`; stops travel/gestures and faces that direction |
+
+Coordinates are world units on the XZ ground plane, with each destination component limited to [-6, 6]. +X is stage-right, +Z is toward the stage front; Y is up. Heading 0° faces +Z, 90° faces +X. Walking travels at 2 units/second, running at 4. `robot.inspect` returns the camera's current position for “face me” instructions.
+
+Commands return `{ accepted: true, state: ... }` immediately, **not when an animation or journey finishes**. Inspect `movement.status` (`idle`, `moving`, `completed`, `cancelled`), its `id` and `target` to observe travel. Inspect `gesture` (null after completion) and `action.status` (`looping`, `playing`, `held`) for animation completion. Poll at a modest rate, such as every 250 ms, before issuing the next sequential action.
+
+A new move replaces the previous destination and cancels a gesture. Stop, turn, state changes, and gestures cancel current travel. A gesture returns to the selected base state; if that base state was Walking/Running it returns to Idle. Death, Sitting, and Standing play once and hold their final pose; other base states loop. Expressions are discovered from the model (Angry, Surprised, Sad), accept weights from 0 to 1, and remain independent of gestures. Invalid commands do not change state. Unsupported commands/values return `INVALID_ARGUMENT`; loading and failed models return `MODEL_NOT_READY` and `MODEL_LOAD_FAILED`.
+
+Tools are discoverable during model loading, so an agent can inspect readiness and failures. Manual controls become enabled only when the model is ready. If WebMCP is unavailable or registration fails, manual controls still work. Leaving the page unregisters both tool sets; a browser back/forward-cache restore reconnects them.
+
+### Connect an agent
+
+**Opening the page does not automatically connect this conversation or any AI agent.** The demo provides page tools, not an embedded chat interface. Use an agent/browser integration that can discover tools in the same live tab; a separate browser opened by automation has a separate scene.
+
+For local Chrome testing, enable `chrome://flags/#enable-webmcp-testing`, relaunch Chrome, and look for “WebMCP tools ready” on the demo. The [Model Context Tool Inspector](https://chromewebstore.google.com/detail/webmcp-model-context-tool/gbpdfapgefenggkahomfgkhfehlcenpd) can invoke tools manually; it is an optional developer tool, not a requirement of WebMCP itself. See the [Chrome WebMCP guide](https://developer.chrome.com/docs/ai/webmcp).
+
+One way to connect a local Codex agent to your existing Chrome tab is [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp). Enable remote debugging at `chrome://inspect/#remote-debugging`, then configure the connection, replacing the URL pattern with the origin/port printed by your dev server:
+
+```sh
+codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest \
+  --autoConnect --allowedUrlPattern 'http://127.0.0.1:5173/*' \
+  --no-usage-statistics
+```
+
+Once the agent has loaded that connection and Chrome has granted access, ask it to use `document.modelContext.getTools()` / `executeTool()` in the demo tab. This lets the agent call WebMCP via the browser connection. No Inspector extension is needed for this route. The integration can control the allowed pages, so restrict the URL pattern to your demo and turn off remote debugging when finished.
+
+### Manual WebMCP check
+
+In the robot page's browser console (Chromium 153):
+
+```js
+const context = document.modelContext;
+const tools = await context.getTools();
+const call = async (name, input = {}) => JSON.parse(await context.executeTool(
+  tools.find(tool => tool.name === name), JSON.stringify(input),
+));
+await call('robot.inspect');
+await call('robot.move', { x: -2, z: 0 });
+// Inspect until movement.status === 'completed', then:
+await call('robot.gesture', { name: 'Wave' });
+await call('robot.expression', { name: 'Surprised', weight: 0.7 });
+```
+
+The model is CC0, by Tomás Laulhé with modifications by Don McCurdy. [Asset provenance and attribution](examples/public/models/RobotExpressive/README.md) and the [Three.js MIT notice](examples/public/THREE-LICENSE.txt) are included and copied into the example build.
+
 ## Cube example
 
 Requires Node.js 22.12+ or 24+ for development.
@@ -110,7 +186,7 @@ npm ci
 npm run example
 ```
 
-Open the local URL printed by Vite in a WebMCP-enabled browser. The page reports when its three tools are ready. Ask your WebMCP-capable agent:
+Open `/cube/` at the local URL printed by Vite in a WebMCP-enabled browser. The page reports when its three tools are ready. Ask your WebMCP-capable agent:
 
 > Inspect the scene, find demo-cube, move it to x=1, y=0, z=0, then inspect again and confirm the new position.
 
@@ -143,4 +219,4 @@ npm run test:browser           # Real WebMCP + WebGL end-to-end checks
 npm pack                       # Build an installable ESM/declarations tarball
 ```
 
-CI runs the same checks. The initial scope deliberately excludes adding/removing objects, material or geometry editing, camera/light tools, animation controls, and application-specific extension APIs. See [Issue #3](https://github.com/takahirox/three-webmcp/issues/3) for the v0.1.0 scope and [Issue #1](https://github.com/takahirox/three-webmcp/issues/1) for the project vision.
+CI runs the same checks, including the actual robot asset and native-browser control flow. Character behavior lives only in the demo; the library’s initial scope still excludes adding/removing objects, material or geometry editing, camera/light tools, animation controls, and application-specific extension APIs. See [Issue #3](https://github.com/takahirox/three-webmcp/issues/3) for the v0.1.0 scope and [Issue #1](https://github.com/takahirox/three-webmcp/issues/1) for the project vision.
