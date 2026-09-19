@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { exposeThreeWebMCP } from '../src/index.ts';
+import { exposeThreeWebMCP } from '../../src/index.ts';
 
 const scene = new THREE.Scene();
 scene.name = 'demo-scene';
