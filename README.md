@@ -1,70 +1,146 @@
 # three-webmcp
 
-Reusable WebMCP integration for Three.js applications.
+Expose an existing Three.js scene to AI agents through WebMCP, using tools for inspecting the scene, updating objects, and inspecting a WebGL renderer.
 
-> **Status:** Early-stage project. The API and toolset are still being designed.
+## Installation
 
-## Overview
-
-`three-webmcp` aims to make it easy for web applications built with [Three.js](https://threejs.org/) to expose their 3D capabilities to AI agents through WebMCP.
-
-Three.js applications already have rich runtime APIs through objects such as scenes, objects, cameras, renderers, and materials. Without a shared integration layer, each application would need to design and implement its own WebMCP tools for common operations.
-
-This project aims to provide that reusable integration layer.
-
-## Vision
-
-A Three.js application should be able to expose common 3D capabilities to AI agents with only a small amount of integration code.
-
-Conceptually, usage could look like this:
-
-```js
-exposeThreeWebMCP({
-  scene,
-  camera,
-  renderer,
-});
+```sh
+npm install three three-webmcp
+# TypeScript applications also need Three.js declarations:
+npm install --save-dev @types/three
 ```
 
-The goal is to provide a common interface across different Three.js applications so that AI agents can understand and interact with Three.js scenes without needing application-specific knowledge for common operations.
+Version 0.1.0 is an ESM package with TypeScript declarations. It supports Three.js r186 (`>=0.186.0 <0.187.0`); Three.js is a peer dependency and is not bundled. Until the package is published, use the tarball produced by `npm pack` instead of the package name.
 
-## Goals
+## Usage
 
-- Make WebMCP integration easy to add to existing Three.js applications.
-- Provide reusable WebMCP tools for common Three.js operations.
-- Provide a consistent interface across different Three.js applications.
-- Allow applications to extend the common toolset with application-specific capabilities.
-- Let application developers control which capabilities are exposed to AI agents.
+```js
+import { exposeThreeWebMCP } from 'three-webmcp';
 
-## Intended experience
+// Pass the objects your application already owns.
+const dispose = exposeThreeWebMCP({ scene, renderer });
 
-With `three-webmcp`, AI agents should eventually be able to perform tasks such as:
+// Optional: wait until every tool is registered and observe failures.
+try {
+  const supported = await dispose.ready;
+  if (!supported) console.info('WebMCP is unavailable or registration was cancelled.');
+} catch (error) {
+  console.error('Could not register Three.js tools', error);
+}
 
-- Understand what objects exist in a scene.
-- Inspect object state and properties.
-- Move, modify, add, or remove objects.
-- Inspect camera and renderer state.
-- Investigate scene or renderer state when diagnosing problems.
-- Use application-specific 3D capabilities exposed by the application.
+// On application teardown:
+dispose();
+```
 
-## Principles
+`scene` is required; `renderer` is optional and currently supports `WebGLRenderer`. Without it, only the scene and object tools are registered. The application retains ownership of all Three.js objects and is responsible for rendering after changes (a continuous render loop is sufficient).
 
-### Keep Three.js core unchanged
+`dispose()` unregisters only this integration's tools, is safe to call repeatedly, and can be called while registration is pending. It does not dispose the scene, geometries, materials, or renderer. `dispose.ready` resolves to `true` after registration, or `false` if WebMCP is unavailable or cleanup interrupted registration. Registration failures roll back this integration's tools and reject `ready`; they also produce a console warning, so ignoring `ready` does not cause an unhandled rejection.
 
-The WebMCP integration should be built on top of the public Three.js API without requiring changes to or a fork of Three.js itself.
+There is one tool set per document. A second integration or an existing tool with the same name causes registration to fail without removing the existing tools. Dispose the first integration before exposing another scene.
 
-### Keep integration simple
+## WebMCP compatibility
 
-Developers should be able to integrate the library into an existing Three.js application with a small amount of code.
+The integration targets the [WebMCP draft dated September 17, 2026](https://webmachinelearning.github.io/webmcp/): `document.modelContext.registerTool()` returning a Promise, with an `AbortSignal` for unregistration. It does not target the older `navigator.modelContext` / `unregisterTool()` API or install a polyfill.
 
-### Provide a common interface
+Use a browser implementing that API in a secure context (HTTPS or localhost), with WebMCP enabled and the `tools` permissions policy allowing access. Browser implementations and this draft are evolving. The browser test uses Playwright's pinned Chromium with `--enable-blink-features=WebMCP`.
 
-Common Three.js operations should not require every application to invent its own WebMCP interface.
+In unsupported browsers and server-side rendering environments, calling `exposeThreeWebMCP()` safely returns an inert cleanup function and `ready` resolves to `false`. The rest of the Three.js application can continue normally.
 
-### Stay extensible
+## Tools
 
-Applications should be able to expose their own domain-specific capabilities alongside the common Three.js tools.
+### `three.scene.inspect`
 
-### Keep exposure under application control
+Input: `{}`. Returns a recursive snapshot of the scene, including the scene root. Each node contains:
 
-Applications should decide which capabilities are made available to AI agents rather than exposing everything automatically.
+```js
+{
+  uuid: '...', name: 'demo-cube', type: 'Mesh', visible: true,
+  position: { x: 0, y: 0, z: 0 },
+  rotation: { x: 0, y: 0, z: 0, order: 'XYZ' },
+  scale: { x: 1, y: 1, z: 1 },
+  children: []
+}
+```
+
+Transforms are local to the parent. Rotation uses Euler angles in radians; `visible` is the object's own flag, not effective visibility inherited from parents. Results are detached, JSON-serializable snapshots. Materials, geometries, and `userData` are not exposed. Scene inspection traverses the full scene, so response size grows with the graph.
+
+### `three.object.update`
+
+Input: a `uuid` from scene inspection and at least one property to change:
+
+```json
+{
+  "uuid": "<UUID from three.scene.inspect>",
+  "position": { "x": 1, "y": 0, "z": 0 },
+  "rotation": { "x": 0, "y": 1.5707963267948966, "z": 0 },
+  "scale": { "x": 1, "y": 1, "z": 1 },
+  "visible": true
+}
+```
+
+Each supplied vector must contain all three finite numeric components. Unspecified properties are preserved. Rotation optionally accepts `order` (`XYZ`, `YZX`, `ZXY`, `XZY`, `YXZ`, or `ZYX`); omitting it preserves the object's current order. Only objects currently in the exposed scene, including the root, can be updated.
+
+The complete request is validated before any mutation. Unknown fields, invalid vectors, or invalid visibility values return `{ "error": { "code": "INVALID_ARGUMENT", "message": "..." } }`. An unknown UUID returns `OBJECT_NOT_FOUND`. Success returns the updated object's snapshot, including children.
+
+Transform updates rebuild the object's local matrix, including when `matrixAutoUpdate` is disabled. World matrices follow the application's usual Three.js update/render cycle. Visibility-only updates preserve manually assigned matrices. The tool does not render a frame or override application animation logic.
+
+### `three.renderer.inspect`
+
+Registered only when a renderer is provided. Input: `{}`. Returns:
+
+```js
+{
+  size: { width: 800, height: 600 }, // Logical pixels, not drawing-buffer pixels
+  pixelRatio: 2,
+  outputColorSpace: 'srgb',
+  toneMapping: 0,                  // Three.js numeric constant
+  calls: 1, triangles: 12,
+  geometries: 1, textures: 0
+}
+```
+
+Statistics are read from `renderer.info` without rendering or resetting counters. Their time window follows the renderer's `info.autoReset` setting. Both inspection tools have the read-only annotation; the update tool does not.
+
+## Cube example
+
+Requires Node.js 22.12+ or 24+ for development.
+
+```sh
+npm ci
+npm run example
+```
+
+Open the local URL printed by Vite in a WebMCP-enabled browser. The page reports when its three tools are ready. Ask your WebMCP-capable agent:
+
+> Inspect the scene, find demo-cube, move it to x=1, y=0, z=0, then inspect again and confirm the new position.
+
+To exercise the same tool flow directly in Chromium 153:
+
+```js
+const context = document.modelContext;
+const tools = await context.getTools();
+const call = async (name, input = {}) => JSON.parse(await context.executeTool(
+  tools.find(tool => tool.name === name), JSON.stringify(input),
+));
+const scene = await call('three.scene.inspect');
+const cube = scene.children.find(object => object.name === 'demo-cube');
+await call('three.object.update', {
+  uuid: cube.uuid, position: { x: 1, y: 0, z: 0 },
+});
+console.log(await call('three.scene.inspect'));
+console.log(await call('three.renderer.inspect'));
+```
+
+Chromium 153 takes JSON text for `executeTool` input. The latest draft instead specifies an object; on browsers implementing that revision, pass `input` directly. This difference affects the calling agent, not the library's registered tool callbacks. See [WebMCP issue #278](https://github.com/webmachinelearning/webmcp/issues/278).
+
+## Development and validation
+
+```sh
+npm test                       # Build and library/lifecycle tests
+npm run example:build          # Build the browser example
+npx playwright install chromium
+npm run test:browser           # Real WebMCP + WebGL end-to-end checks
+npm pack                       # Build an installable ESM/declarations tarball
+```
+
+CI runs the same checks. The initial scope deliberately excludes adding/removing objects, material or geometry editing, camera/light tools, animation controls, and application-specific extension APIs. See [Issue #3](https://github.com/takahirox/three-webmcp/issues/3) for the v0.1.0 scope and [Issue #1](https://github.com/takahirox/three-webmcp/issues/1) for the project vision.
