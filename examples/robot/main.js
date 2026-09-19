@@ -82,7 +82,15 @@ function command(operation, input = {}) {
   if (!robot) return;
   try {
     const result = robot.command(operation, input);
-    feedback(operation === 'move' ? 'On the way. Click Stop to interrupt.' : `${operation === 'stop' ? 'Stopped' : 'Done'} · ${result.state.action.name}`);
+    const messages = {
+      move: result.state.movement.status === 'completed' ? 'Already at the destination.' : 'Destination set. Use Stop to interrupt.',
+      gesture: `Gesture requested · ${result.state.action.name}`,
+      state: `Animation selected · ${result.state.baseState}`,
+      expression: 'Expression updated.',
+      turn: 'Direction updated.',
+      stop: 'Stopped.',
+    };
+    feedback(messages[operation]);
     syncUI();
   } catch (error) { feedback(error.message, true); }
 }
@@ -185,7 +193,7 @@ function syncUI() {
   for (const button of $('#gestures').children) pressed(button, button.dataset.action === state.gesture);
   for (const input of document.querySelectorAll('[data-expression]')) {
     const value = state.expressions[input.dataset.expression];
-    if (document.activeElement !== input) input.value = String(value);
+    if (Number(input.value) !== value) input.value = String(value);
     text(input.nextElementSibling, `${Math.round(value * 100)}%`);
   }
   marker.visible = state.movement.status === 'moving';

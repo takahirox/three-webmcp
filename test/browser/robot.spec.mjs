@@ -35,6 +35,8 @@ test('native tools control the real robot: move, arrive, wave, expression, turn,
   await call(page, 'robot.gesture', { name: 'Wave' });
   await expect(page.locator('#action-label')).toHaveText('Wave');
   await expect.poll(async () => (await call(page, 'robot.inspect')).gesture, { timeout: 10000 }).toBe(null);
+  // A focused manual slider must still reflect changes made by an agent.
+  await page.getByRole('slider', { name: 'Surprised' }).focus();
   await call(page, 'robot.expression', { name: 'Surprised', weight: 0.8 });
   await expect(page.getByRole('slider', { name: 'Surprised' })).toHaveValue('0.8');
   await call(page, 'robot.turn', { toward: initial.cameraPosition && { x: initial.cameraPosition.x, z: initial.cameraPosition.z } });
@@ -42,6 +44,8 @@ test('native tools control the real robot: move, arrive, wave, expression, turn,
   expect(after.headingDegrees).toBeCloseTo(Math.atan2(initial.cameraPosition.x + 2, initial.cameraPosition.z - 1) * 180 / Math.PI);
   expect(after.expressions.Surprised).toBe(0.8);
   expect(after.baseState).toBe('Idle');
+  await page.getByRole('slider', { name: 'Surprised' }).press('ArrowRight');
+  expect((await call(page, 'robot.inspect')).expressions.Surprised).toBe(0.81);
   expect((await call(page, 'three.renderer.inspect')).triangles).toBeGreaterThan(100);
   expect(errors).toEqual([]);
 });
