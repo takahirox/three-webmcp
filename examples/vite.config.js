@@ -8,7 +8,6 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: { input: {
       robot: fileURLToPath(new URL('./index.html', import.meta.url)),
-      cube: fileURLToPath(new URL('./cube/index.html', import.meta.url)),
     } },
   },
 });
