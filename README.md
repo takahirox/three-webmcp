@@ -2,6 +2,8 @@
 
 Expose an existing Three.js scene to AI agents through WebMCP, using tools for inspecting the scene, updating objects, and inspecting a WebGL renderer.
 
+**[Try the robot playground demo](https://takahirox.github.io/three-webmcp/).** You can use its manual controls in any modern browser. To control the robot with an AI, you need a WebMCP-enabled browser and an agent connected to that tab (see [Connect an agent](#connect-an-agent)).
+
 ## Installation
 
 ```sh
@@ -102,6 +104,8 @@ Registered only when a renderer is provided. Input: `{}`. Returns:
 Statistics are read from `renderer.info` without rendering or resetting counters. Their time window follows the renderer's `info.autoReset` setting. Both inspection tools have the read-only annotation; the update tool does not.
 
 ## Robot playground
+
+A hosted build is available at **https://takahirox.github.io/three-webmcp/**. It is deployed to GitHub Pages from `main` by the [Pages workflow](.github/workflows/pages.yml). As with a local run, a WebMCP-enabled browser and a connected agent are needed to control it with an AI (see below). To run it locally:
 
 ```sh
 npm ci
