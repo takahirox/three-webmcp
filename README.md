@@ -103,12 +103,14 @@ Statistics are read from `renderer.info` without rendering or resetting counters
 
 ## Robot playground
 
+Requires Node.js 22.12+ or 24+ for development.
+
 ```sh
 npm ci
 npm run example
 ```
 
-Open the printed local URL for the **robot playground** (`/`). The original **cube example** is still available at `/cube/`. The robot model is included locally, so neither demo needs a CDN or an AI API key. Both pages are included in `npm run example:build` under `example-dist/` (serve that directory over HTTP).
+Open the printed local URL for the **robot playground** (`/`). The robot model is included locally, so the demo needs no CDN or AI API key. The page is included in `npm run example:build` under `example-dist/` (serve that directory over HTTP).
 
 The robot is based on the [Three.js skinning and morphing example](https://threejs.org/examples/#webgl_animation_skinning_morph), with a control panel for states, gestures, expressions, travel, and turning. Click the floor to move, or enter an X/Z destination and choose Walk or Run. Manual controls and agent tools use exactly the same character controller. The panel shows changes made by an agent, too.
 
@@ -175,39 +177,9 @@ await call('robot.gesture', { name: 'Wave' });
 await call('robot.expression', { name: 'Surprised', weight: 0.7 });
 ```
 
-The model is CC0, by Tomás Laulhé with modifications by Don McCurdy. [Asset provenance and attribution](examples/public/models/RobotExpressive/README.md) and the [Three.js MIT notice](examples/public/THREE-LICENSE.txt) are included and copied into the example build.
-
-## Cube example
-
-Requires Node.js 22.12+ or 24+ for development.
-
-```sh
-npm ci
-npm run example
-```
-
-Open `/cube/` at the local URL printed by Vite in a WebMCP-enabled browser. The page reports when its three tools are ready. Ask your WebMCP-capable agent:
-
-> Inspect the scene, find demo-cube, move it to x=1, y=0, z=0, then inspect again and confirm the new position.
-
-To exercise the same tool flow directly in Chromium 153:
-
-```js
-const context = document.modelContext;
-const tools = await context.getTools();
-const call = async (name, input = {}) => JSON.parse(await context.executeTool(
-  tools.find(tool => tool.name === name), JSON.stringify(input),
-));
-const scene = await call('three.scene.inspect');
-const cube = scene.children.find(object => object.name === 'demo-cube');
-await call('three.object.update', {
-  uuid: cube.uuid, position: { x: 1, y: 0, z: 0 },
-});
-console.log(await call('three.scene.inspect'));
-console.log(await call('three.renderer.inspect'));
-```
-
 Chromium 153 takes JSON text for `executeTool` input. The latest draft instead specifies an object; on browsers implementing that revision, pass `input` directly. This difference affects the calling agent, not the library's registered tool callbacks. See [WebMCP issue #278](https://github.com/webmachinelearning/webmcp/issues/278).
+
+The model is CC0, by Tomás Laulhé with modifications by Don McCurdy. [Asset provenance and attribution](examples/public/models/RobotExpressive/README.md) and the [Three.js MIT notice](examples/public/THREE-LICENSE.txt) are included and copied into the example build.
 
 ## Development and validation
 
