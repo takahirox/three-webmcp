@@ -52,13 +52,13 @@ In unsupported browsers and server-side rendering environments, calling `exposeT
 
 ### `three.scene.inspect`
 
-Input: `{}`. Returns a recursive snapshot of the scene, including the scene root. Each node contains:
+Input: `{}`. Returns a recursive snapshot of the scene, including the scene root. Each node contains (here, the robot playground's floor):
 
 ```js
 {
-  uuid: '...', name: 'demo-cube', type: 'Mesh', visible: true,
+  uuid: '...', name: 'ground', type: 'Mesh', visible: true,
   position: { x: 0, y: 0, z: 0 },
-  rotation: { x: 0, y: 0, z: 0, order: 'XYZ' },
+  rotation: { x: -1.5707963267948966, y: 0, z: 0, order: 'XYZ' },
   scale: { x: 1, y: 1, z: 1 },
   children: []
 }
@@ -88,7 +88,7 @@ Transform updates rebuild the object's local matrix, including when `matrixAutoU
 
 ### `three.renderer.inspect`
 
-Registered only when a renderer is provided. Input: `{}`. Returns:
+Registered only when a renderer is provided. Input: `{}`. Returns (statistics shown are from the robot playground):
 
 ```js
 {
@@ -96,8 +96,8 @@ Registered only when a renderer is provided. Input: `{}`. Returns:
   pixelRatio: 2,
   outputColorSpace: 'srgb',
   toneMapping: 0,                  // Three.js numeric constant
-  calls: 1, triangles: 12,
-  geometries: 1, textures: 0
+  calls: 40, triangles: 6476,
+  geometries: 21, textures: 8
 }
 ```
 
@@ -186,11 +186,11 @@ The model is CC0, by Tomás Laulhé with modifications by Don McCurdy. [Asset pr
 ## Development and validation
 
 ```sh
-npm test                       # Build and library/lifecycle tests
-npm run example:build          # Build the browser example
+npm test                       # Build, then library and robot controller tests
+npm run example:build          # Build the robot playground into example-dist/
 npx playwright install chromium
-npm run test:browser           # Real WebMCP + WebGL end-to-end checks
+npm run test:browser           # Real WebMCP + WebGL end-to-end checks on the robot playground
 npm pack                       # Build an installable ESM/declarations tarball
 ```
 
-CI runs the same checks, including the actual robot asset and native-browser control flow. Character behavior lives only in the demo; the library’s initial scope still excludes adding/removing objects, material or geometry editing, camera/light tools, animation controls, and application-specific extension APIs. See [Issue #3](https://github.com/takahirox/three-webmcp/issues/3) for the v0.1.0 scope and [Issue #1](https://github.com/takahirox/three-webmcp/issues/1) for the project vision.
+CI runs the same checks, including the actual robot asset and native-browser control flow. The [Pages workflow](.github/workflows/pages.yml) separately builds and deploys the demo on pushes to `main`. Character behavior lives only in the demo; the library’s initial scope still excludes adding/removing objects, material or geometry editing, camera/light tools, animation controls, and application-specific extension APIs. See [Issue #3](https://github.com/takahirox/three-webmcp/issues/3) for the v0.1.0 scope and [Issue #1](https://github.com/takahirox/three-webmcp/issues/1) for the project vision.
